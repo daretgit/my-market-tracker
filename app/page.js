@@ -261,6 +261,27 @@ export default function Home() {
     await cargarMisHogares(user.id);
   };
 
+  const salirDeCasa = async () => {
+    const confirmar = window.confirm(
+      `¿Seguro que quieres salir de "${hogarActivo.nombre}"? Ya no verás su inventario, a menos que te vuelvan a invitar.`
+    );
+    if (!confirmar) return;
+
+    const { error } = await supabase
+      .from("miembros_hogar")
+      .delete()
+      .eq("hogar_id", hogarActivo.id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      setMensajeError("No se pudo salir de la casa. Intenta de nuevo.");
+      return;
+    }
+
+    setHogarActivo(null);
+    await cargarMisHogares(user.id);
+  };
+
   const compartirInvitacion = async () => {
     setMensajeError("");
     const url = `${window.location.origin}?hogar=${hogarActivo.id}`;
@@ -538,9 +559,13 @@ export default function Home() {
 
           <button onClick={volverAlMenu}>← Cambiar de casa</button>
 
-          {hogarActivo.rol === "dueño" && (
+          {hogarActivo.rol === "dueño" ? (
             <button onClick={eliminarHogar} style={{ color: "red" }}>
               Eliminar esta casa
+            </button>
+          ) : (
+            <button onClick={salirDeCasa} style={{ color: "red" }}>
+              Salir de esta casa
             </button>
           )}
 
