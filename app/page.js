@@ -469,7 +469,7 @@ export default function Home() {
             <h3>Crear un hogar nuevo</h3>
             <input
               type="text"
-              placeholder="Nombre del hogar (ej. Casa de David)"
+              placeholder="Nombre del hogar"
               value={nombreHogar}
               onChange={(e) => setNombreHogar(e.target.value)}
             />
@@ -548,7 +548,7 @@ export default function Home() {
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <input
               type="text"
-              placeholder="Nombre de la zona (ej. Nevera)"
+              placeholder="Agregar zona"
               value={nombreZona}
               onChange={(e) => setNombreZona(e.target.value)}
             />
