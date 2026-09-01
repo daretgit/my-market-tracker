@@ -13,6 +13,14 @@ export default function Home() {
   const [misHogares, setMisHogares] = useState([]);
   const [hogarActivo, setHogarActivo] = useState(null);
 
+  const [zonas, setZonas] = useState([]);
+  const [zonaActiva, setZonaActiva] = useState(null);
+  const [nombreZona, setNombreZona] = useState("");
+
+  const [productos, setProductos] = useState([]);
+  const [nombreProducto, setNombreProducto] = useState("");
+  const [cantidadProducto, setCantidadProducto] = useState(1);
+
   const [nombreHogar, setNombreHogar] = useState("");
   const [codigoInvitacion, setCodigoInvitacion] = useState("");
   const [mensajeError, setMensajeError] = useState("");
@@ -47,6 +55,26 @@ export default function Home() {
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  // Cuando cambia el hogar activo, recargamos sus zonas
+  useEffect(() => {
+    if (hogarActivo) {
+      cargarZonas(hogarActivo.id);
+      setZonaActiva(null);
+      setProductos([]);
+    } else {
+      setZonas([]);
+    }
+  }, [hogarActivo?.id]);
+
+  // Cuando cambia la zona activa, recargamos sus productos
+  useEffect(() => {
+    if (zonaActiva) {
+      cargarProductos(zonaActiva.id);
+    } else {
+      setProductos([]);
+    }
+  }, [zonaActiva?.id]);
 
   const cargarPerfil = async (userId) => {
     const { data } = await supabase
@@ -193,6 +221,109 @@ export default function Home() {
     await cargarMisHogares(user.id);
   };
 
+  // ---------- ZONAS ----------
+
+  const cargarZonas = async (hogarId) => {
+    const { data } = await supabase
+      .from("zonas")
+      .select("id, nombre")
+      .eq("hogar_id", hogarId)
+      .order("nombre");
+
+    setZonas(data || []);
+  };
+
+  const crearZona = async () => {
+    setMensajeError("");
+    if (!nombreZona.trim()) return;
+
+    const { error } = await supabase
+      .from("zonas")
+      .insert({ hogar_id: hogarActivo.id, nombre: nombreZona.trim() });
+
+    if (error) {
+      setMensajeError("No se pudo crear la zona. Intenta de nuevo.");
+      return;
+    }
+
+    setNombreZona("");
+    await cargarZonas(hogarActivo.id);
+  };
+
+  const eliminarZona = async (zona) => {
+    const confirmar = window.confirm(
+      `¿Eliminar la zona "${zona.nombre}"? Esto borra también sus productos.`
+    );
+    if (!confirmar) return;
+
+    const { error } = await supabase.from("zonas").delete().eq("id", zona.id);
+
+    if (error) {
+      setMensajeError("No se pudo eliminar la zona.");
+      return;
+    }
+
+    if (zonaActiva?.id === zona.id) {
+      setZonaActiva(null);
+    }
+    await cargarZonas(hogarActivo.id);
+  };
+
+  const volverAHogar = () => {
+    setZonaActiva(null);
+    setMensajeError("");
+  };
+
+  // ---------- PRODUCTOS ----------
+
+  const cargarProductos = async (zonaId) => {
+    const { data } = await supabase
+      .from("productos")
+      .select("id, nombre, cantidad, unidad")
+      .eq("zona_id", zonaId)
+      .order("nombre");
+
+    setProductos(data || []);
+  };
+
+  const agregarProducto = async () => {
+    setMensajeError("");
+    if (!nombreProducto.trim()) return;
+
+    const { error } = await supabase.from("productos").insert({
+      zona_id: zonaActiva.id,
+      nombre: nombreProducto.trim(),
+      cantidad: cantidadProducto,
+      unidad: "unidad",
+    });
+
+    if (error) {
+      setMensajeError("No se pudo añadir el producto.");
+      return;
+    }
+
+    setNombreProducto("");
+    setCantidadProducto(1);
+    await cargarProductos(zonaActiva.id);
+  };
+
+  const cambiarCantidad = async (producto, delta) => {
+    const nuevaCantidad = producto.cantidad + delta;
+    if (nuevaCantidad < 0) return;
+
+    await supabase
+      .from("productos")
+      .update({ cantidad: nuevaCantidad })
+      .eq("id", producto.id);
+
+    await cargarProductos(zonaActiva.id);
+  };
+
+  const eliminarProducto = async (producto) => {
+    await supabase.from("productos").delete().eq("id", producto.id);
+    await cargarProductos(zonaActiva.id);
+  };
+
   if (cargando) {
     return <p style={{ textAlign: "center", marginTop: "4rem" }}>Cargando...</p>;
   }
@@ -224,7 +355,7 @@ export default function Home() {
           <p>¿Cómo quieres que te llamemos dentro de la app?</p>
           <input
             type="text"
-            placeholder="Tu Nombre"
+            placeholder="Tu nombre"
             value={nombrePreferido}
             onChange={(e) => setNombrePreferido(e.target.value)}
           />
@@ -252,7 +383,7 @@ export default function Home() {
             <h3>Crear un hogar nuevo</h3>
             <input
               type="text"
-              placeholder="Nombre del hogar"
+              placeholder="Nombre del hogar (ej. Casa de David)"
               value={nombreHogar}
               onChange={(e) => setNombreHogar(e.target.value)}
             />
@@ -276,20 +407,47 @@ export default function Home() {
         </div>
       )}
 
-      {/* Dentro de una casa específica */}
-      {user && hogarActivo && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+      {/* Dentro de una casa específica, viendo sus zonas */}
+      {user && hogarActivo && !zonaActiva && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%", maxWidth: "320px" }}>
           <p>Bienvenido a <strong>{hogarActivo.nombre}</strong> (rol: {hogarActivo.rol})</p>
 
           <div>
             <p style={{ fontSize: "0.85rem", color: "#555", marginBottom: "0.3rem" }}>
-              Código de invitación para compartir con tu familia:
+              Código de invitación:
             </p>
             <code style={{ display: "block", marginBottom: "0.4rem" }}>{hogarActivo.id}</code>
             <button onClick={copiarCodigo}>
               {copiado ? "¡Copiado!" : "Copiar código"}
             </button>
           </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <h3>Zonas</h3>
+            {zonas.length === 0 && <p style={{ fontSize: "0.85rem", color: "#777" }}>Aún no hay zonas.</p>}
+            {zonas.map((z) => (
+              <div key={z.id} style={{ display: "flex", gap: "0.4rem" }}>
+                <button style={{ flex: 1 }} onClick={() => setZonaActiva(z)}>
+                  {z.nombre}
+                </button>
+                <button onClick={() => eliminarZona(z)} style={{ color: "red" }}>
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <input
+              type="text"
+              placeholder="Nombre de la zona (ej. Nevera)"
+              value={nombreZona}
+              onChange={(e) => setNombreZona(e.target.value)}
+            />
+            <button onClick={crearZona}>Añadir zona</button>
+          </div>
+
+          {mensajeError && <p style={{ color: "red" }}>{mensajeError}</p>}
 
           <button onClick={volverAlMenu}>← Cambiar de casa</button>
 
@@ -300,6 +458,64 @@ export default function Home() {
           )}
 
           <button onClick={cerrarSesion}>Cerrar sesión</button>
+        </div>
+      )}
+
+      {/* Dentro de una zona específica, viendo sus productos */}
+      {user && zonaActiva && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%", maxWidth: "320px" }}>
+          <p>
+            <strong>{zonaActiva.nombre}</strong> — {hogarActivo.nombre}
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {productos.length === 0 && (
+              <p style={{ fontSize: "0.85rem", color: "#777" }}>Aún no hay productos aquí.</p>
+            )}
+            {productos.map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  border: "1px solid #ccc",
+                  borderRadius: "6px",
+                  padding: "0.4rem 0.6rem",
+                }}
+              >
+                <span>{p.nombre}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <button onClick={() => cambiarCantidad(p, -1)}>-</button>
+                  <span>{p.cantidad}</span>
+                  <button onClick={() => cambiarCantidad(p, 1)}>+</button>
+                  <button onClick={() => eliminarProducto(p)} style={{ color: "red" }}>
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <input
+              type="text"
+              placeholder="Nombre del producto (ej. Leche)"
+              value={nombreProducto}
+              onChange={(e) => setNombreProducto(e.target.value)}
+            />
+            <input
+              type="number"
+              min="0"
+              value={cantidadProducto}
+              onChange={(e) => setCantidadProducto(Number(e.target.value))}
+            />
+            <button onClick={agregarProducto}>Añadir producto</button>
+          </div>
+
+          {mensajeError && <p style={{ color: "red" }}>{mensajeError}</p>}
+
+          <button onClick={volverAHogar}>← Volver a {hogarActivo.nombre}</button>
         </div>
       )}
     </main>
