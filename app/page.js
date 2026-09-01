@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { jsPDF } from "jspdf";
 import { supabase } from "../lib/supabaseClient";
 
 export default function Home() {
@@ -26,6 +25,7 @@ export default function Home() {
   const [codigoInvitacion, setCodigoInvitacion] = useState("");
   const [mensajeError, setMensajeError] = useState("");
   const [copiado, setCopiado] = useState(false);
+  const [mostrarInvitacion, setMostrarInvitacion] = useState(false);
 
   useEffect(() => {
     const inicializar = async () => {
@@ -80,8 +80,7 @@ export default function Home() {
   const entrarPorQR = async (userId) => {
     const params = new URLSearchParams(window.location.search);
     const hogarId = params.get("hogar");
-    const zonaId = params.get("zona");
-    if (!hogarId || !zonaId) return;
+    if (!hogarId) return;
 
     // ¿Ya es miembro de esta casa?
     const { data: miembroExistente } = await supabase
@@ -109,17 +108,11 @@ export default function Home() {
       .eq("id", hogarId)
       .maybeSingle();
 
-    const { data: zonaInfo } = await supabase
-      .from("zonas")
-      .select("id, nombre")
-      .eq("id", zonaId)
-      .maybeSingle();
-
-    if (!hogarInfo || !zonaInfo) return;
+    if (!hogarInfo) return;
 
     await cargarMisHogares(userId);
+    setZonaActiva(null);
     setHogarActivo({ id: hogarInfo.id, nombre: hogarInfo.nombre, rol });
-    setZonaActiva({ id: zonaInfo.id, nombre: zonaInfo.nombre });
   };
 
   const cargarPerfil = async (userId) => {
@@ -268,32 +261,28 @@ export default function Home() {
     await cargarMisHogares(user.id);
   };
 
-  const descargarQR = async (zona) => {
+  const compartirInvitacion = async () => {
     setMensajeError("");
-    try {
-      const urlZona = `${window.location.origin}?hogar=${hogarActivo.id}&zona=${zona.id}`;
-      const urlImagenQR = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(urlZona)}`;
+    const url = `${window.location.origin}?hogar=${hogarActivo.id}`;
 
-      const respuesta = await fetch(urlImagenQR);
-      const blob = await respuesta.blob();
-      const dataUrl = await new Promise((resolve, reject) => {
-        const lector = new FileReader();
-        lector.onload = () => resolve(lector.result);
-        lector.onerror = reject;
-        lector.readAsDataURL(blob);
-      });
-
-      const doc = new jsPDF();
-      doc.setFontSize(20);
-      doc.text(hogarActivo.nombre, 105, 25, { align: "center" });
-      doc.setFontSize(28);
-      doc.text(zona.nombre, 105, 40, { align: "center" });
-      doc.addImage(dataUrl, "PNG", 55, 55, 100, 100);
-      doc.setFontSize(11);
-      doc.text("Escanea este código para ver el inventario de esta zona", 105, 170, { align: "center" });
-      doc.save(`QR-${zona.nombre}.pdf`);
-    } catch (e) {
-      setMensajeError("No se pudo generar el PDF. Intenta de nuevo.");
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Únete a ${hogarActivo.nombre}`,
+          text: `Únete a mi casa en My Market Tracker`,
+          url,
+        });
+      } catch (e) {
+        // el usuario cerró el cuadro de compartir sin enviar nada, no hacemos nada
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2000);
+      } catch (e) {
+        setMensajeError("No se pudo copiar el link.");
+      }
     }
   };
 
@@ -498,6 +487,28 @@ export default function Home() {
             </button>
           </div>
 
+          <div>
+            <button onClick={() => setMostrarInvitacion(!mostrarInvitacion)}>
+              {mostrarInvitacion ? "Ocultar invitación" : "Invitar a esta casa"}
+            </button>
+
+            {mostrarInvitacion && (
+              <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                    `${typeof window !== "undefined" ? window.location.origin : ""}?hogar=${hogarActivo.id}`
+                  )}`}
+                  alt="Código QR de invitación"
+                  width={220}
+                  height={220}
+                />
+                <button onClick={compartirInvitacion}>
+                  {copiado ? "¡Enlace copiado!" : "Enviar invitación"}
+                </button>
+              </div>
+            )}
+          </div>
+
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <h3>Zonas</h3>
             {zonas.length === 0 && <p style={{ fontSize: "0.85rem", color: "#777" }}>Aún no hay zonas.</p>}
@@ -543,10 +554,6 @@ export default function Home() {
           <p>
             <strong>{zonaActiva.nombre}</strong> — {hogarActivo.nombre}
           </p>
-
-          <button onClick={() => descargarQR(zonaActiva)}>
-            📄 Descargar QR de esta zona
-          </button>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             {productos.length === 0 && (
