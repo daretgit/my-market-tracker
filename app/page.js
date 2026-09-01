@@ -51,7 +51,7 @@ export default function Home() {
         gap: "1rem",
       }}
     >
-      <h1>Inventario de Cocina</h1>
+      <h1>My Market Tracker</h1>
 
       {user ? (
         <>
