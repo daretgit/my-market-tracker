@@ -19,7 +19,7 @@ export default function Home() {
 
   const [productos, setProductos] = useState([]);
   const [nombreProducto, setNombreProducto] = useState("");
-  const [cantidadProducto, setCantidadProducto] = useState(1);
+  const [cantidadProducto] = useState(0);
   const [fechaCaducidad, setFechaCaducidad] = useState("");
 
   const [nombreHogar, setNombreHogar] = useState("");
@@ -564,7 +564,7 @@ export default function Home() {
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <input
               type="text"
-              placeholder="Nombre de la zona (ej. Nevera)"
+              placeholder="Nombre de la zona"
               value={nombreZona}
               onChange={(e) => setNombreZona(e.target.value)}
             />
@@ -638,15 +638,9 @@ export default function Home() {
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <input
               type="text"
-              placeholder="Nombre del producto (ej. Leche)"
+              placeholder="Nombre del producto"
               value={nombreProducto}
               onChange={(e) => setNombreProducto(e.target.value)}
-            />
-            <input
-              type="number"
-              min="0"
-              value={cantidadProducto}
-              onChange={(e) => setCantidadProducto(Number(e.target.value))}
             />
             <input
               type="text"
