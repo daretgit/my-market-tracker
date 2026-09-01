@@ -5,18 +5,26 @@ import { supabase } from "../lib/supabaseClient";
 
 export default function Home() {
   const [user, setUser] = useState(null);
-  const [hogar, setHogar] = useState(null);
   const [cargando, setCargando] = useState(true);
+
+  const [perfil, setPerfil] = useState(null);
+  const [nombrePreferido, setNombrePreferido] = useState("");
+
+  const [misHogares, setMisHogares] = useState([]);
+  const [hogarActivo, setHogarActivo] = useState(null);
+
   const [nombreHogar, setNombreHogar] = useState("");
   const [codigoInvitacion, setCodigoInvitacion] = useState("");
   const [mensajeError, setMensajeError] = useState("");
+  const [copiado, setCopiado] = useState(false);
 
   useEffect(() => {
     const inicializar = async () => {
       const { data } = await supabase.auth.getUser();
       setUser(data.user);
       if (data.user) {
-        await cargarHogar(data.user.id);
+        await cargarPerfil(data.user.id);
+        await cargarMisHogares(data.user.id);
       }
       setCargando(false);
     };
@@ -27,9 +35,12 @@ export default function Home() {
       async (_event, session) => {
         setUser(session?.user ?? null);
         if (session?.user) {
-          await cargarHogar(session.user.id);
+          await cargarPerfil(session.user.id);
+          await cargarMisHogares(session.user.id);
         } else {
-          setHogar(null);
+          setPerfil(null);
+          setMisHogares([]);
+          setHogarActivo(null);
         }
       }
     );
@@ -37,14 +48,45 @@ export default function Home() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  const cargarHogar = async (userId) => {
+  const cargarPerfil = async (userId) => {
+    const { data } = await supabase
+      .from("perfiles")
+      .select("nombre_mostrar")
+      .eq("id", userId)
+      .maybeSingle();
+
+    setPerfil(data ? data.nombre_mostrar : null);
+  };
+
+  const guardarPerfil = async () => {
+    setMensajeError("");
+    if (!nombrePreferido.trim()) return;
+
+    const { error } = await supabase
+      .from("perfiles")
+      .insert({ id: user.id, nombre_mostrar: nombrePreferido.trim() });
+
+    if (error) {
+      setMensajeError("No se pudo guardar tu nombre. Intenta de nuevo.");
+      return;
+    }
+
+    setPerfil(nombrePreferido.trim());
+  };
+
+  const cargarMisHogares = async (userId) => {
     const { data } = await supabase
       .from("miembros_hogar")
       .select("hogar_id, rol, hogares(id, nombre)")
-      .eq("user_id", userId)
-      .maybeSingle();
+      .eq("user_id", userId);
 
-    setHogar(data ? { id: data.hogares.id, nombre: data.hogares.nombre, rol: data.rol } : null);
+    const lista = (data || []).map((fila) => ({
+      id: fila.hogares.id,
+      nombre: fila.hogares.nombre,
+      rol: fila.rol,
+    }));
+
+    setMisHogares(lista);
   };
 
   const loginConGoogle = async () => {
@@ -56,7 +98,9 @@ export default function Home() {
 
   const cerrarSesion = async () => {
     await supabase.auth.signOut();
-    setHogar(null);
+    setPerfil(null);
+    setMisHogares([]);
+    setHogarActivo(null);
   };
 
   const crearHogar = async () => {
@@ -83,7 +127,9 @@ export default function Home() {
       return;
     }
 
-    await cargarHogar(user.id);
+    setNombreHogar("");
+    await cargarMisHogares(user.id);
+    setHogarActivo({ id: nuevoHogar.id, nombre: nuevoHogar.nombre, rol: "dueño" });
   };
 
   const unirseAHogar = async () => {
@@ -99,7 +145,32 @@ export default function Home() {
       return;
     }
 
-    await cargarHogar(user.id);
+    const { data: hogarUnido } = await supabase
+      .from("hogares")
+      .select("id, nombre")
+      .eq("id", codigoInvitacion.trim())
+      .maybeSingle();
+
+    setCodigoInvitacion("");
+    await cargarMisHogares(user.id);
+    if (hogarUnido) {
+      setHogarActivo({ id: hogarUnido.id, nombre: hogarUnido.nombre, rol: "miembro" });
+    }
+  };
+
+  const copiarCodigo = async () => {
+    try {
+      await navigator.clipboard.writeText(hogarActivo.id);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch (e) {
+      setMensajeError("No se pudo copiar. Copia el código manualmente.");
+    }
+  };
+
+  const volverAlMenu = () => {
+    setHogarActivo(null);
+    setMensajeError("");
   };
 
   if (cargando) {
@@ -122,13 +193,40 @@ export default function Home() {
     >
       <h1>My Market Tracker</h1>
 
+      {/* No ha iniciado sesión */}
       {!user && (
         <button onClick={loginConGoogle}>Iniciar sesión con Google</button>
       )}
 
-      {user && !hogar && (
+      {/* Ya inició sesión pero no ha elegido un nombre para mostrar */}
+      {user && perfil === null && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", width: "100%", maxWidth: "320px" }}>
+          <p>¿Cómo quieres que te llamemos dentro de la app?</p>
+          <input
+            type="text"
+            placeholder="Ej. David"
+            value={nombrePreferido}
+            onChange={(e) => setNombrePreferido(e.target.value)}
+          />
+          <button onClick={guardarPerfil}>Guardar</button>
+          {mensajeError && <p style={{ color: "red" }}>{mensajeError}</p>}
+        </div>
+      )}
+
+      {/* Menú principal: elegir casa, crear una nueva, o unirse a otra */}
+      {user && perfil !== null && !hogarActivo && (
         <div style={{ display: "flex", flexDirection: "column", gap: "2rem", width: "100%", maxWidth: "320px" }}>
-          <p>Hola {user.email}, aún no perteneces a ningún hogar.</p>
+          <p>Hola {perfil}, ¿a cuál casa quieres entrar?</p>
+
+          {misHogares.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              {misHogares.map((h) => (
+                <button key={h.id} onClick={() => setHogarActivo(h)}>
+                  {h.nombre} ({h.rol})
+                </button>
+              ))}
+            </div>
+          )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <h3>Crear un hogar nuevo</h3>
@@ -158,14 +256,22 @@ export default function Home() {
         </div>
       )}
 
-      {user && hogar && (
-        <div>
-          <p>Bienvenido a <strong>{hogar.nombre}</strong> (rol: {hogar.rol})</p>
-          <p style={{ fontSize: "0.85rem", color: "#555" }}>
-            Código de invitación para compartir con tu familia:
-            <br />
-            <code>{hogar.id}</code>
-          </p>
+      {/* Dentro de una casa específica */}
+      {user && hogarActivo && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <p>Bienvenido a <strong>{hogarActivo.nombre}</strong> (rol: {hogarActivo.rol})</p>
+
+          <div>
+            <p style={{ fontSize: "0.85rem", color: "#555", marginBottom: "0.3rem" }}>
+              Código de invitación para compartir con tu familia:
+            </p>
+            <code style={{ display: "block", marginBottom: "0.4rem" }}>{hogarActivo.id}</code>
+            <button onClick={copiarCodigo}>
+              {copiado ? "¡Copiado!" : "Copiar código"}
+            </button>
+          </div>
+
+          <button onClick={volverAlMenu}>← Cambiar de casa</button>
           <button onClick={cerrarSesion}>Cerrar sesión</button>
         </div>
       )}
