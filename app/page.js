@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { jsPDF } from "jspdf";
 import { supabase } from "../lib/supabaseClient";
 
 export default function Home() {
@@ -33,6 +34,7 @@ export default function Home() {
       if (data.user) {
         await cargarPerfil(data.user.id);
         await cargarMisHogares(data.user.id);
+        await entrarPorQR(data.user.id);
       }
       setCargando(false);
     };
@@ -45,6 +47,7 @@ export default function Home() {
         if (session?.user) {
           await cargarPerfil(session.user.id);
           await cargarMisHogares(session.user.id);
+          await entrarPorQR(session.user.id);
         } else {
           setPerfil(null);
           setMisHogares([]);
@@ -75,6 +78,38 @@ export default function Home() {
       setProductos([]);
     }
   }, [zonaActiva?.id]);
+
+  const entrarPorQR = async (userId) => {
+    const params = new URLSearchParams(window.location.search);
+    const zonaId = params.get("zona");
+    if (!zonaId) return;
+
+    const { data: zona } = await supabase
+      .from("zonas")
+      .select("id, nombre, hogar_id")
+      .eq("id", zonaId)
+      .maybeSingle();
+
+    if (!zona) return;
+
+    const { data: hogarInfo } = await supabase
+      .from("hogares")
+      .select("id, nombre")
+      .eq("id", zona.hogar_id)
+      .maybeSingle();
+
+    if (!hogarInfo) return;
+
+    const { data: miembro } = await supabase
+      .from("miembros_hogar")
+      .select("rol")
+      .eq("hogar_id", zona.hogar_id)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    setHogarActivo({ id: hogarInfo.id, nombre: hogarInfo.nombre, rol: miembro?.rol || "miembro" });
+    setZonaActiva({ id: zona.id, nombre: zona.nombre });
+  };
 
   const cargarPerfil = async (userId) => {
     const { data } = await supabase
@@ -219,6 +254,35 @@ export default function Home() {
 
     setHogarActivo(null);
     await cargarMisHogares(user.id);
+  };
+
+  const descargarQR = async (zona) => {
+    setMensajeError("");
+    try {
+      const urlZona = `${window.location.origin}?zona=${zona.id}`;
+      const urlImagenQR = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(urlZona)}`;
+
+      const respuesta = await fetch(urlImagenQR);
+      const blob = await respuesta.blob();
+      const dataUrl = await new Promise((resolve, reject) => {
+        const lector = new FileReader();
+        lector.onload = () => resolve(lector.result);
+        lector.onerror = reject;
+        lector.readAsDataURL(blob);
+      });
+
+      const doc = new jsPDF();
+      doc.setFontSize(20);
+      doc.text(hogarActivo.nombre, 105, 25, { align: "center" });
+      doc.setFontSize(28);
+      doc.text(zona.nombre, 105, 40, { align: "center" });
+      doc.addImage(dataUrl, "PNG", 55, 55, 100, 100);
+      doc.setFontSize(11);
+      doc.text("Escanea este código para ver el inventario de esta zona", 105, 170, { align: "center" });
+      doc.save(`QR-${zona.nombre}.pdf`);
+    } catch (e) {
+      setMensajeError("No se pudo generar el PDF. Intenta de nuevo.");
+    }
   };
 
   // ---------- ZONAS ----------
@@ -430,6 +494,7 @@ export default function Home() {
                 <button style={{ flex: 1 }} onClick={() => setZonaActiva(z)}>
                   {z.nombre}
                 </button>
+                <button onClick={() => descargarQR(z)}>QR</button>
                 <button onClick={() => eliminarZona(z)} style={{ color: "red" }}>
                   ✕
                 </button>
