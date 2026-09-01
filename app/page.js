@@ -81,34 +81,47 @@ export default function Home() {
 
   const entrarPorQR = async (userId) => {
     const params = new URLSearchParams(window.location.search);
+    const hogarId = params.get("hogar");
     const zonaId = params.get("zona");
-    if (!zonaId) return;
+    if (!hogarId || !zonaId) return;
 
-    const { data: zona } = await supabase
-      .from("zonas")
-      .select("id, nombre, hogar_id")
-      .eq("id", zonaId)
+    // ¿Ya es miembro de esta casa?
+    const { data: miembroExistente } = await supabase
+      .from("miembros_hogar")
+      .select("rol")
+      .eq("hogar_id", hogarId)
+      .eq("user_id", userId)
       .maybeSingle();
 
-    if (!zona) return;
+    let rol = miembroExistente?.rol;
+
+    // Si no es miembro, lo unimos automáticamente (eso es lo que hace el QR especial)
+    if (!miembroExistente) {
+      const { error } = await supabase
+        .from("miembros_hogar")
+        .insert({ hogar_id: hogarId, user_id: userId, rol: "miembro" });
+
+      if (error) return; // la casa no existe o algo falló, no hacemos nada más
+      rol = "miembro";
+    }
 
     const { data: hogarInfo } = await supabase
       .from("hogares")
       .select("id, nombre")
-      .eq("id", zona.hogar_id)
+      .eq("id", hogarId)
       .maybeSingle();
 
-    if (!hogarInfo) return;
-
-    const { data: miembro } = await supabase
-      .from("miembros_hogar")
-      .select("rol")
-      .eq("hogar_id", zona.hogar_id)
-      .eq("user_id", userId)
+    const { data: zonaInfo } = await supabase
+      .from("zonas")
+      .select("id, nombre")
+      .eq("id", zonaId)
       .maybeSingle();
 
-    setHogarActivo({ id: hogarInfo.id, nombre: hogarInfo.nombre, rol: miembro?.rol || "miembro" });
-    setZonaActiva({ id: zona.id, nombre: zona.nombre });
+    if (!hogarInfo || !zonaInfo) return;
+
+    await cargarMisHogares(userId);
+    setHogarActivo({ id: hogarInfo.id, nombre: hogarInfo.nombre, rol });
+    setZonaActiva({ id: zonaInfo.id, nombre: zonaInfo.nombre });
   };
 
   const cargarPerfil = async (userId) => {
@@ -259,7 +272,7 @@ export default function Home() {
   const descargarQR = async (zona) => {
     setMensajeError("");
     try {
-      const urlZona = `${window.location.origin}?zona=${zona.id}`;
+      const urlZona = `${window.location.origin}?hogar=${hogarActivo.id}&zona=${zona.id}`;
       const urlImagenQR = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(urlZona)}`;
 
       const respuesta = await fetch(urlImagenQR);
