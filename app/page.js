@@ -20,12 +20,19 @@ export default function Home() {
   const [productos, setProductos] = useState([]);
   const [nombreProducto, setNombreProducto] = useState("");
   const [cantidadProducto, setCantidadProducto] = useState(1);
+  const [fechaCaducidad, setFechaCaducidad] = useState("");
 
   const [nombreHogar, setNombreHogar] = useState("");
   const [codigoInvitacion, setCodigoInvitacion] = useState("");
   const [mensajeError, setMensajeError] = useState("");
   const [copiado, setCopiado] = useState(false);
   const [mostrarInvitacion, setMostrarInvitacion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     const inicializar = async () => {
@@ -307,6 +314,15 @@ export default function Home() {
     }
   };
 
+  const manejarCambioFecha = (valorIngresado) => {
+    const soloDigitos = valorIngresado.replace(/\D/g, "").slice(0, 6);
+    let formateado = soloDigitos;
+    if (soloDigitos.length > 2) {
+      formateado = `${soloDigitos.slice(0, 2)}/${soloDigitos.slice(2)}`;
+    }
+    setFechaCaducidad(formateado);
+  };
+
   // ---------- ZONAS ----------
 
   const cargarZonas = async (hogarId) => {
@@ -365,7 +381,7 @@ export default function Home() {
   const cargarProductos = async (zonaId) => {
     const { data } = await supabase
       .from("productos")
-      .select("id, nombre, cantidad, unidad")
+      .select("id, nombre, cantidad, unidad, fecha_caducidad")
       .eq("zona_id", zonaId)
       .order("nombre");
 
@@ -381,6 +397,7 @@ export default function Home() {
       nombre: nombreProducto.trim(),
       cantidad: cantidadProducto,
       unidad: "unidad",
+      fecha_caducidad: fechaCaducidad.length === 7 ? fechaCaducidad : null,
     });
 
     if (error) {
@@ -390,6 +407,7 @@ export default function Home() {
 
     setNombreProducto("");
     setCantidadProducto(1);
+    setFechaCaducidad("");
     await cargarProductos(zonaActiva.id);
   };
 
@@ -469,7 +487,7 @@ export default function Home() {
             <h3>Crear un hogar nuevo</h3>
             <input
               type="text"
-              placeholder="Nombre del hogar"
+              placeholder="Nombre del hogar (ej. Casa de David)"
               value={nombreHogar}
               onChange={(e) => setNombreHogar(e.target.value)}
             />
@@ -499,22 +517,20 @@ export default function Home() {
           <p>Bienvenido a <strong>{hogarActivo.nombre}</strong> (rol: {hogarActivo.rol})</p>
 
           <div>
-            <p style={{ fontSize: "0.85rem", color: "#555", marginBottom: "0.3rem" }}>
-              Código de invitación:
-            </p>
-            <code style={{ display: "block", marginBottom: "0.4rem" }}>{hogarActivo.id}</code>
-            <button onClick={copiarCodigo}>
-              {copiado ? "¡Copiado!" : "Copiar código"}
-            </button>
-          </div>
-
-          <div>
             <button onClick={() => setMostrarInvitacion(!mostrarInvitacion)}>
-              {mostrarInvitacion ? "Ocultar invitación" : "Invitar a esta casa"}
+              {mostrarInvitacion ? "Ocultar invitación" : "Compartir invitación"}
             </button>
 
             {mostrarInvitacion && (
               <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
+                <p style={{ fontSize: "0.85rem", color: "#555", marginBottom: "0.2rem" }}>
+                  Código de invitación:
+                </p>
+                <code style={{ display: "block", marginBottom: "0.2rem" }}>{hogarActivo.id}</code>
+                <button onClick={copiarCodigo}>
+                  {copiado ? "¡Copiado!" : "Copiar código"}
+                </button>
+
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
                     `${typeof window !== "undefined" ? window.location.origin : ""}?hogar=${hogarActivo.id}`
@@ -548,7 +564,7 @@ export default function Home() {
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <input
               type="text"
-              placeholder="Agregar zona"
+              placeholder="Nombre de la zona (ej. Nevera)"
               value={nombreZona}
               onChange={(e) => setNombreZona(e.target.value)}
             />
@@ -596,7 +612,17 @@ export default function Home() {
                   padding: "0.4rem 0.6rem",
                 }}
               >
-                <span>{p.nombre}</span>
+                <span>
+                  {p.nombre}
+                  {p.fecha_caducidad && (
+                    <>
+                      <br />
+                      <span style={{ fontSize: "0.75rem", color: "#888" }}>
+                        Vence: {p.fecha_caducidad}
+                      </span>
+                    </>
+                  )}
+                </span>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                   <button onClick={() => cambiarCantidad(p, -1)}>-</button>
                   <span>{p.cantidad}</span>
@@ -621,6 +647,14 @@ export default function Home() {
               min="0"
               value={cantidadProducto}
               onChange={(e) => setCantidadProducto(Number(e.target.value))}
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="Caducidad MM/AAAA (opcional)"
+              value={fechaCaducidad}
+              maxLength={7}
+              onChange={(e) => manejarCambioFecha(e.target.value)}
             />
             <button onClick={agregarProducto}>Añadir producto</button>
           </div>
