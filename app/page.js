@@ -224,7 +224,7 @@ export default function Home() {
           <p>¿Cómo quieres que te llamemos dentro de la app?</p>
           <input
             type="text"
-            placeholder="Ej. David"
+            placeholder="Tu Nombre"
             value={nombrePreferido}
             onChange={(e) => setNombrePreferido(e.target.value)}
           />
@@ -252,7 +252,7 @@ export default function Home() {
             <h3>Crear un hogar nuevo</h3>
             <input
               type="text"
-              placeholder="Nombre del hogar (ej. Casa de David)"
+              placeholder="Nombre del hogar"
               value={nombreHogar}
               onChange={(e) => setNombreHogar(e.target.value)}
             />
