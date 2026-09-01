@@ -494,7 +494,6 @@ export default function Home() {
                 <button style={{ flex: 1 }} onClick={() => setZonaActiva(z)}>
                   {z.nombre}
                 </button>
-                <button onClick={() => descargarQR(z)}>QR</button>
                 <button onClick={() => eliminarZona(z)} style={{ color: "red" }}>
                   ✕
                 </button>
@@ -532,6 +531,10 @@ export default function Home() {
           <p>
             <strong>{zonaActiva.nombre}</strong> — {hogarActivo.nombre}
           </p>
+
+          <button onClick={() => descargarQR(zonaActiva)}>
+            📄 Descargar QR de esta zona
+          </button>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             {productos.length === 0 && (
