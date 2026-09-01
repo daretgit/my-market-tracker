@@ -173,6 +173,26 @@ export default function Home() {
     setMensajeError("");
   };
 
+  const eliminarHogar = async () => {
+    const confirmar = window.confirm(
+      `¿Seguro que quieres eliminar "${hogarActivo.nombre}"? Esto borra también todas sus zonas y productos. Esta acción no se puede deshacer.`
+    );
+    if (!confirmar) return;
+
+    const { error } = await supabase
+      .from("hogares")
+      .delete()
+      .eq("id", hogarActivo.id);
+
+    if (error) {
+      setMensajeError("No se pudo eliminar el hogar. Intenta de nuevo.");
+      return;
+    }
+
+    setHogarActivo(null);
+    await cargarMisHogares(user.id);
+  };
+
   if (cargando) {
     return <p style={{ textAlign: "center", marginTop: "4rem" }}>Cargando...</p>;
   }
@@ -272,6 +292,13 @@ export default function Home() {
           </div>
 
           <button onClick={volverAlMenu}>← Cambiar de casa</button>
+
+          {hogarActivo.rol === "dueño" && (
+            <button onClick={eliminarHogar} style={{ color: "red" }}>
+              Eliminar esta casa
+            </button>
+          )}
+
           <button onClick={cerrarSesion}>Cerrar sesión</button>
         </div>
       )}
