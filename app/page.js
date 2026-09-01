@@ -63,8 +63,6 @@ export default function Home() {
   useEffect(() => {
     if (hogarActivo) {
       cargarZonas(hogarActivo.id);
-      setZonaActiva(null);
-      setProductos([]);
     } else {
       setZonas([]);
     }
@@ -246,6 +244,7 @@ export default function Home() {
 
   const volverAlMenu = () => {
     setHogarActivo(null);
+    setZonaActiva(null);
     setMensajeError("");
   };
 
@@ -449,7 +448,7 @@ export default function Home() {
           {misHogares.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               {misHogares.map((h) => (
-                <button key={h.id} onClick={() => setHogarActivo(h)}>
+                <button key={h.id} onClick={() => { setZonaActiva(null); setHogarActivo(h); }}>
                   {h.nombre} ({h.rol})
                 </button>
               ))}
