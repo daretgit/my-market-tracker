@@ -21,6 +21,7 @@ export default function Home() {
   const [nombreProducto, setNombreProducto] = useState("");
   const [cantidadProducto] = useState(0);
   const [fechaCaducidad, setFechaCaducidad] = useState("");
+  const [cantidadIdeal, setCantidadIdeal] = useState("");
 
   const [nombreHogar, setNombreHogar] = useState("");
   const [codigoInvitacion, setCodigoInvitacion] = useState("");
@@ -381,7 +382,7 @@ export default function Home() {
   const cargarProductos = async (zonaId) => {
     const { data } = await supabase
       .from("productos")
-      .select("id, nombre, cantidad, unidad, fecha_caducidad")
+      .select("id, nombre, cantidad, unidad, fecha_caducidad, cantidad_ideal")
       .eq("zona_id", zonaId)
       .order("nombre");
 
@@ -398,6 +399,7 @@ export default function Home() {
       cantidad: cantidadProducto,
       unidad: "unidad",
       fecha_caducidad: fechaCaducidad.length === 7 ? fechaCaducidad : null,
+      cantidad_ideal: cantidadIdeal.trim() ? Number(cantidadIdeal) : null,
     });
 
     if (error) {
@@ -406,8 +408,8 @@ export default function Home() {
     }
 
     setNombreProducto("");
-    setCantidadProducto(1);
     setFechaCaducidad("");
+    setCantidadIdeal("");
     await cargarProductos(zonaActiva.id);
   };
 
@@ -625,7 +627,10 @@ export default function Home() {
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                   <button onClick={() => cambiarCantidad(p, -1)}>-</button>
-                  <span>{p.cantidad}</span>
+                  <span>
+                    {p.cantidad}
+                    {p.cantidad_ideal ? `/${p.cantidad_ideal}` : ""}
+                  </span>
                   <button onClick={() => cambiarCantidad(p, 1)}>+</button>
                   <button onClick={() => eliminarProducto(p)} style={{ color: "red" }}>
                     ✕
@@ -649,6 +654,13 @@ export default function Home() {
               value={fechaCaducidad}
               maxLength={7}
               onChange={(e) => manejarCambioFecha(e.target.value)}
+            />
+            <input
+              type="number"
+              min="0"
+              placeholder="Cantidad ideal a tener (opcional)"
+              value={cantidadIdeal}
+              onChange={(e) => setCantidadIdeal(e.target.value)}
             />
             <button onClick={agregarProducto}>Añadir producto</button>
           </div>
