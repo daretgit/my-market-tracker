@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "My Market Tracker",
+  title: "My Item Tracker",
   description: "Gestión del inventario de tu cocina por zonas",
 };
 
