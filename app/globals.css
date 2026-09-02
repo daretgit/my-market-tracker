@@ -65,16 +65,13 @@ body {
 }
 
 .brand-mark {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--primary-dark);
-  background: var(--surface);
+  width: 38px;
+  height: 38px;
   border-radius: 12px;
-  padding: 0.55rem 0.7rem;
+  background: var(--surface);
   box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.12);
-  white-space: nowrap;
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
 .brand h1 {
