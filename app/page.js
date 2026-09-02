@@ -189,7 +189,7 @@ export default function Home() {
       .single();
 
     if (errorHogar) {
-      setMensajeError("No se pudo crear el hogar. Intenta de nuevo.");
+      setMensajeError("No se pudo crear el espacio. Intenta de nuevo.");
       return;
     }
 
@@ -198,7 +198,7 @@ export default function Home() {
       .insert({ hogar_id: nuevoHogar.id, user_id: user.id, rol: "dueño" });
 
     if (errorMiembro) {
-      setMensajeError("El hogar se creó pero hubo un error al unirte. Contacta soporte.");
+      setMensajeError("El espacio se creó pero hubo un error al unirte. Contacta soporte.");
       return;
     }
 
@@ -216,7 +216,7 @@ export default function Home() {
       .insert({ hogar_id: codigoInvitacion.trim(), user_id: user.id, rol: "miembro" });
 
     if (error) {
-      setMensajeError("Código inválido, o ya perteneces a ese hogar.");
+      setMensajeError("Código inválido, o ya perteneces a ese espacio.");
       return;
     }
 
@@ -261,7 +261,7 @@ export default function Home() {
       .eq("id", hogarActivo.id);
 
     if (error) {
-      setMensajeError("No se pudo eliminar el hogar. Intenta de nuevo.");
+      setMensajeError("No se pudo eliminar el espacio. Intenta de nuevo.");
       return;
     }
 
@@ -282,7 +282,7 @@ export default function Home() {
       .eq("user_id", user.id);
 
     if (error) {
-      setMensajeError("No se pudo salir de la casa. Intenta de nuevo.");
+      setMensajeError("No se pudo salir del espacio. Intenta de nuevo.");
       return;
     }
 
@@ -298,7 +298,7 @@ export default function Home() {
       try {
         await navigator.share({
           title: `Únete a ${hogarActivo.nombre}`,
-          text: `Únete a mi casa en My Market Tracker`,
+          text: `Únete a mi espacio en My Item Tracker`,
           url,
         });
       } catch (e) {
@@ -345,7 +345,7 @@ export default function Home() {
       .insert({ hogar_id: hogarActivo.id, nombre: nombreZona.trim() });
 
     if (error) {
-      setMensajeError("No se pudo crear la zona. Intenta de nuevo.");
+      setMensajeError("No se pudo crear el espacio. Intenta de nuevo.");
       return;
     }
 
@@ -362,7 +362,7 @@ export default function Home() {
     const { error } = await supabase.from("zonas").delete().eq("id", zona.id);
 
     if (error) {
-      setMensajeError("No se pudo eliminar la zona.");
+      setMensajeError("No se pudo eliminar el espacio.");
       return;
     }
 
@@ -470,10 +470,10 @@ export default function Home() {
         </div>
       )}
 
-      {/* Menú principal: elegir casa, crear una nueva, o unirse a otra */}
+      {/* Menú principal: elegir espacio, crear uno nuevo, o unirse a otro */}
       {user && perfil !== null && !hogarActivo && (
         <div style={{ display: "flex", flexDirection: "column", gap: "2rem", width: "100%", maxWidth: "320px" }}>
-          <p>Hola {perfil}, ¿a cuál casa quieres entrar?</p>
+          <p>Hola {perfil}, ¿a qué espacio quieres entrar?</p>
 
           {misHogares.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -486,18 +486,18 @@ export default function Home() {
           )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <h3>Crear un hogar nuevo</h3>
+            <h3>Añadir un espacio</h3>
             <input
               type="text"
-              placeholder="Nombre del hogar (ej. Casa de David)"
+              placeholder="Nombre del espacio"
               value={nombreHogar}
               onChange={(e) => setNombreHogar(e.target.value)}
             />
-            <button onClick={crearHogar}>Crear hogar</button>
+            <button onClick={crearHogar}>Añadir espacio</button>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <h3>Unirme a un hogar existente</h3>
+            <h3>Unirme a un espacio existente</h3>
             <input
               type="text"
               placeholder="Código de invitación"
@@ -513,10 +513,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* Dentro de una casa específica, viendo sus zonas */}
+      {/* Dentro de un espacio específico, viendo sus zonas */}
       {user && hogarActivo && !zonaActiva && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%", maxWidth: "320px" }}>
           <p>Bienvenido a <strong>{hogarActivo.nombre}</strong> (rol: {hogarActivo.rol})</p>
+
+          <button onClick={volverAlMenu}>← Cambiar de espacio</button>
 
           <div>
             <button onClick={() => setMostrarInvitacion(!mostrarInvitacion)}>
@@ -575,15 +577,13 @@ export default function Home() {
 
           {mensajeError && <p style={{ color: "red" }}>{mensajeError}</p>}
 
-          <button onClick={volverAlMenu}>← Cambiar de casa</button>
-
           {hogarActivo.rol === "dueño" ? (
             <button onClick={eliminarHogar} style={{ color: "red" }}>
-              Eliminar esta casa
+              Eliminar este espacio
             </button>
           ) : (
             <button onClick={salirDeCasa} style={{ color: "red" }}>
-              Salir de esta casa
+              Salir de este espacio
             </button>
           )}
 
