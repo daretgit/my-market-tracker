@@ -28,12 +28,29 @@ export default function Home() {
   const [mensajeError, setMensajeError] = useState("");
   const [copiado, setCopiado] = useState(false);
   const [mostrarInvitacion, setMostrarInvitacion] = useState(false);
+  const [tema, setTema] = useState("light");
 
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
   }, []);
+
+  useEffect(() => {
+    const temaGuardado = typeof window !== "undefined" ? localStorage.getItem("tema") : null;
+    if (temaGuardado === "dark") {
+      setTema("dark");
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", tema);
+    localStorage.setItem("tema", tema);
+  }, [tema]);
+
+  const alternarTema = () => {
+    setTema((t) => (t === "light" ? "dark" : "light"));
+  };
 
   useEffect(() => {
     const inicializar = async () => {
@@ -67,7 +84,7 @@ export default function Home() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  // Cuando cambia el hogar activo, recargamos sus zonas
+  // Cuando cambia el espacio activo, recargamos sus zonas
   useEffect(() => {
     if (hogarActivo) {
       cargarZonas(hogarActivo.id);
@@ -90,7 +107,6 @@ export default function Home() {
     const hogarId = params.get("hogar");
     if (!hogarId) return;
 
-    // ¿Ya es miembro de esta casa?
     const { data: miembroExistente } = await supabase
       .from("miembros_hogar")
       .select("rol")
@@ -100,13 +116,12 @@ export default function Home() {
 
     let rol = miembroExistente?.rol;
 
-    // Si no es miembro, lo unimos automáticamente (eso es lo que hace el QR especial)
     if (!miembroExistente) {
       const { error } = await supabase
         .from("miembros_hogar")
         .insert({ hogar_id: hogarId, user_id: userId, rol: "miembro" });
 
-      if (error) return; // la casa no existe o algo falló, no hacemos nada más
+      if (error) return;
       rol = "miembro";
     }
 
@@ -189,7 +204,7 @@ export default function Home() {
       .single();
 
     if (errorHogar) {
-      setMensajeError("No se pudo crear el hogar. Intenta de nuevo.");
+      setMensajeError("No se pudo crear el espacio. Intenta de nuevo.");
       return;
     }
 
@@ -198,7 +213,7 @@ export default function Home() {
       .insert({ hogar_id: nuevoHogar.id, user_id: user.id, rol: "dueño" });
 
     if (errorMiembro) {
-      setMensajeError("El hogar se creó pero hubo un error al unirte. Contacta soporte.");
+      setMensajeError("El espacio se creó pero hubo un error al unirte. Contacta soporte.");
       return;
     }
 
@@ -216,7 +231,7 @@ export default function Home() {
       .insert({ hogar_id: codigoInvitacion.trim(), user_id: user.id, rol: "miembro" });
 
     if (error) {
-      setMensajeError("Código inválido, o ya perteneces a ese hogar.");
+      setMensajeError("Código inválido, o ya perteneces a ese espacio.");
       return;
     }
 
@@ -243,6 +258,31 @@ export default function Home() {
     }
   };
 
+  const compartirInvitacion = async () => {
+    setMensajeError("");
+    const url = `${window.location.origin}?hogar=${hogarActivo.id}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Únete a ${hogarActivo.nombre}`,
+          text: `Únete a mi espacio en My Item Tracker`,
+          url,
+        });
+      } catch (e) {
+        // el usuario cerró el cuadro de compartir sin enviar nada
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2000);
+      } catch (e) {
+        setMensajeError("No se pudo copiar el link.");
+      }
+    }
+  };
+
   const volverAlMenu = () => {
     setHogarActivo(null);
     setZonaActiva(null);
@@ -251,7 +291,7 @@ export default function Home() {
 
   const eliminarHogar = async () => {
     const confirmar = window.confirm(
-      `¿Seguro que quieres eliminar "${hogarActivo.nombre}"? Esto borra también todos sus espacios y productos. Esta acción no se puede deshacer.`
+      `¿Seguro que quieres eliminar "${hogarActivo.nombre}"? Esto borra también todas sus zonas y productos. Esta acción no se puede deshacer.`
     );
     if (!confirmar) return;
 
@@ -261,7 +301,7 @@ export default function Home() {
       .eq("id", hogarActivo.id);
 
     if (error) {
-      setMensajeError("No se pudo eliminar el hogar. Intenta de nuevo.");
+      setMensajeError("No se pudo eliminar el espacio. Intenta de nuevo.");
       return;
     }
 
@@ -282,46 +322,12 @@ export default function Home() {
       .eq("user_id", user.id);
 
     if (error) {
-      setMensajeError("No se pudo salir de la casa. Intenta de nuevo.");
+      setMensajeError("No se pudo salir del espacio. Intenta de nuevo.");
       return;
     }
 
     setHogarActivo(null);
     await cargarMisHogares(user.id);
-  };
-
-  const compartirInvitacion = async () => {
-    setMensajeError("");
-    const url = `${window.location.origin}?hogar=${hogarActivo.id}`;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Únete a ${hogarActivo.nombre}`,
-          text: `Únete a mi casa en My Market Tracker`,
-          url,
-        });
-      } catch (e) {
-        // el usuario cerró el cuadro de compartir sin enviar nada, no hacemos nada
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(url);
-        setCopiado(true);
-        setTimeout(() => setCopiado(false), 2000);
-      } catch (e) {
-        setMensajeError("No se pudo copiar el link.");
-      }
-    }
-  };
-
-  const manejarCambioFecha = (valorIngresado) => {
-    const soloDigitos = valorIngresado.replace(/\D/g, "").slice(0, 6);
-    let formateado = soloDigitos;
-    if (soloDigitos.length > 2) {
-      formateado = `${soloDigitos.slice(0, 2)}/${soloDigitos.slice(2)}`;
-    }
-    setFechaCaducidad(formateado);
   };
 
   // ---------- ZONAS ----------
@@ -345,7 +351,7 @@ export default function Home() {
       .insert({ hogar_id: hogarActivo.id, nombre: nombreZona.trim() });
 
     if (error) {
-      setMensajeError("No se pudo crear el espacio. Intenta de nuevo.");
+      setMensajeError("No se pudo crear la zona. Intenta de nuevo.");
       return;
     }
 
@@ -355,14 +361,14 @@ export default function Home() {
 
   const eliminarZona = async (zona) => {
     const confirmar = window.confirm(
-      `¿Eliminar el espacio "${zona.nombre}"? Esto borra también sus productos.`
+      `¿Eliminar la zona "${zona.nombre}"? Esto borra también sus productos.`
     );
     if (!confirmar) return;
 
     const { error } = await supabase.from("zonas").delete().eq("id", zona.id);
 
     if (error) {
-      setMensajeError("No se pudo eliminar el espacio.");
+      setMensajeError("No se pudo eliminar la zona.");
       return;
     }
 
@@ -378,6 +384,15 @@ export default function Home() {
   };
 
   // ---------- PRODUCTOS ----------
+
+  const manejarCambioFecha = (valorIngresado) => {
+    const soloDigitos = valorIngresado.replace(/\D/g, "").slice(0, 6);
+    let formateado = soloDigitos;
+    if (soloDigitos.length > 2) {
+      formateado = `${soloDigitos.slice(0, 2)}/${soloDigitos.slice(2)}`;
+    }
+    setFechaCaducidad(formateado);
+  };
 
   const cargarProductos = async (zonaId) => {
     const { data } = await supabase
@@ -431,33 +446,35 @@ export default function Home() {
   };
 
   if (cargando) {
-    return <p style={{ textAlign: "center", marginTop: "4rem" }}>Cargando...</p>;
+    return (
+      <main className="app-shell">
+        <p className="muted">Cargando...</p>
+      </main>
+    );
   }
 
   return (
-    <main
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        fontFamily: "sans-serif",
-        gap: "1rem",
-        padding: "1rem",
-        textAlign: "center",
-      }}
-    >
-      <h1>My Item Tracker</h1>
+    <main className="app-shell">
+      <div className="brand">
+        <span className="brand-mark">MIT</span>
+        <h1>My Item Tracker</h1>
+      </div>
 
       {/* No ha iniciado sesión */}
       {!user && (
-        <button onClick={loginConGoogle}>Iniciar sesión con Google</button>
+        <div className="stack stack-md">
+          <p className="muted">
+            Lleva el inventario de tus cosas por espacios y zonas, y compártelo con quien quieras.
+          </p>
+          <button className="btn btn-primary" onClick={loginConGoogle}>
+            Iniciar sesión con Google
+          </button>
+        </div>
       )}
 
       {/* Ya inició sesión pero no ha elegido un nombre para mostrar */}
       {user && perfil === null && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", width: "100%", maxWidth: "320px" }}>
+        <div className="stack stack-sm">
           <p>¿Cómo quieres que te llamemos dentro de la app?</p>
           <input
             type="text"
@@ -465,174 +482,196 @@ export default function Home() {
             value={nombrePreferido}
             onChange={(e) => setNombrePreferido(e.target.value)}
           />
-          <button onClick={guardarPerfil}>Guardar</button>
-          {mensajeError && <p style={{ color: "red" }}>{mensajeError}</p>}
+          <button className="btn btn-primary" onClick={guardarPerfil}>
+            Guardar
+          </button>
+          {mensajeError && <p className="error-text">{mensajeError}</p>}
         </div>
       )}
 
-      {/* Menú principal: elegir casa, crear una nueva, o unirse a otra */}
+      {/* Menú principal: elegir espacio, crear uno nuevo, o unirse a otro */}
       {user && perfil !== null && !hogarActivo && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "2rem", width: "100%", maxWidth: "320px" }}>
-          <p>Hola {perfil}, ¿a cuál casa quieres entrar?</p>
+        <div className="stack stack-lg">
+          <p className="welcome-line">Hola {perfil}, ¿a qué espacio quieres entrar?</p>
 
           {misHogares.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <div className="stack stack-sm">
               {misHogares.map((h) => (
-                <button key={h.id} onClick={() => { setZonaActiva(null); setHogarActivo(h); }}>
-                  {h.nombre} ({h.rol})
+                <button
+                  key={h.id}
+                  className="tag-name-btn"
+                  onClick={() => {
+                    setZonaActiva(null);
+                    setHogarActivo(h);
+                  }}
+                >
+                  {h.nombre} <span className="muted">({h.rol})</span>
                 </button>
               ))}
             </div>
           )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <h3>Crear un hogar nuevo</h3>
+          <div className="stack stack-sm">
+            <h3 className="section-title">Añadir un espacio</h3>
             <input
               type="text"
-              placeholder="Nombre del hogar (ej. Casa de David)"
+              placeholder="Nombre del espacio"
               value={nombreHogar}
               onChange={(e) => setNombreHogar(e.target.value)}
             />
-            <button onClick={crearHogar}>Crear hogar</button>
+            <button className="btn btn-primary" onClick={crearHogar}>
+              Añadir espacio
+            </button>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <h3>Unirme a un hogar existente</h3>
+          <div className="stack stack-sm">
+            <h3 className="section-title">Unirme a un espacio existente</h3>
             <input
               type="text"
               placeholder="Código de invitación"
               value={codigoInvitacion}
               onChange={(e) => setCodigoInvitacion(e.target.value)}
             />
-            <button onClick={unirseAHogar}>Unirme</button>
+            <button className="btn" onClick={unirseAHogar}>
+              Unirme
+            </button>
           </div>
 
-          {mensajeError && <p style={{ color: "red" }}>{mensajeError}</p>}
+          {mensajeError && <p className="error-text">{mensajeError}</p>}
 
-          <button onClick={cerrarSesion}>Cerrar sesión</button>
+          <button className="btn" onClick={cerrarSesion}>
+            Cerrar sesión
+          </button>
+
+          <button className="theme-toggle" onClick={alternarTema}>
+            {tema === "light" ? "🌙 Modo oscuro" : "☀️ Modo claro"}
+          </button>
         </div>
       )}
 
-      {/* Dentro de una casa específica, viendo sus zonas */}
+      {/* Dentro de un espacio específico, viendo sus zonas */}
       {user && hogarActivo && !zonaActiva && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%", maxWidth: "320px" }}>
-          <p>Bienvenido a <strong>{hogarActivo.nombre}</strong> (rol: {hogarActivo.rol})</p>
+        <div className="stack stack-lg">
+          <p className="welcome-line">
+            Bienvenido a <strong>{hogarActivo.nombre}</strong>{" "}
+            <span className="muted">(rol: {hogarActivo.rol})</span>
+          </p>
 
-          <div>
-            <button onClick={() => setMostrarInvitacion(!mostrarInvitacion)}>
+          <button className="btn" onClick={volverAlMenu}>
+            ← Cambiar de espacio
+          </button>
+
+          <div className="stack stack-sm">
+            <button className="btn" onClick={() => setMostrarInvitacion(!mostrarInvitacion)}>
               {mostrarInvitacion ? "Ocultar invitación" : "Compartir invitación"}
             </button>
 
             {mostrarInvitacion && (
-              <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
-                <p style={{ fontSize: "0.85rem", color: "#555", marginBottom: "0.2rem" }}>
-                  Código de invitación:
-                </p>
-                <code style={{ display: "block", marginBottom: "0.2rem" }}>{hogarActivo.id}</code>
-                <button onClick={copiarCodigo}>
+              <div className="center-col">
+                <p className="muted">Código de invitación:</p>
+                <code className="code-chip">{hogarActivo.id}</code>
+                <button className="btn" onClick={copiarCodigo}>
                   {copiado ? "¡Copiado!" : "Copiar código"}
                 </button>
 
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
-                    `${typeof window !== "undefined" ? window.location.origin : ""}?hogar=${hogarActivo.id}`
-                  )}`}
-                  alt="Código QR de invitación"
-                  width={220}
-                  height={220}
-                />
-                <button onClick={compartirInvitacion}>
+                <div className="qr-frame">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                      `${typeof window !== "undefined" ? window.location.origin : ""}?hogar=${hogarActivo.id}`
+                    )}`}
+                    alt="Código QR de invitación"
+                    width={200}
+                    height={200}
+                  />
+                </div>
+                <button className="btn btn-primary" onClick={compartirInvitacion}>
                   {copiado ? "¡Enlace copiado!" : "Enviar invitación"}
                 </button>
               </div>
             )}
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <h3>Espacios</h3>
-            {zonas.length === 0 && <p style={{ fontSize: "0.85rem", color: "#777" }}>Aún no hay espacios.</p>}
+          <div className="stack stack-sm">
+            <h3 className="section-title">Zonas</h3>
+            {zonas.length === 0 && <p className="muted">Aún no hay zonas.</p>}
             {zonas.map((z) => (
-              <div key={z.id} style={{ display: "flex", gap: "0.4rem" }}>
-                <button style={{ flex: 1 }} onClick={() => setZonaActiva(z)}>
+              <div key={z.id} className="list-row">
+                <button className="tag-name-btn" onClick={() => setZonaActiva(z)}>
                   {z.nombre}
                 </button>
-                <button onClick={() => eliminarZona(z)} style={{ color: "red" }}>
+                <button className="btn btn-danger btn-icon" onClick={() => eliminarZona(z)}>
                   ✕
                 </button>
               </div>
             ))}
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div className="stack stack-sm">
             <input
               type="text"
-              placeholder="Nombre del espacio"
+              placeholder="Nombre de la zona"
               value={nombreZona}
               onChange={(e) => setNombreZona(e.target.value)}
             />
-            <button onClick={crearZona}>Añadir espacio</button>
+            <button className="btn btn-primary" onClick={crearZona}>
+              Añadir zona
+            </button>
           </div>
 
-          {mensajeError && <p style={{ color: "red" }}>{mensajeError}</p>}
+          {mensajeError && <p className="error-text">{mensajeError}</p>}
 
-          <button onClick={volverAlMenu}>← Cambiar de casa</button>
+          <hr className="divider" />
 
           {hogarActivo.rol === "dueño" ? (
-            <button onClick={eliminarHogar} style={{ color: "red" }}>
-              Eliminar esta casa
+            <button className="btn btn-danger" onClick={eliminarHogar}>
+              Eliminar este espacio
             </button>
           ) : (
-            <button onClick={salirDeCasa} style={{ color: "red" }}>
-              Salir de esta casa
+            <button className="btn btn-danger" onClick={salirDeCasa}>
+              Salir de este espacio
             </button>
           )}
 
-          <button onClick={cerrarSesion}>Cerrar sesión</button>
+          <button className="btn" onClick={cerrarSesion}>
+            Cerrar sesión
+          </button>
         </div>
       )}
 
       {/* Dentro de una zona específica, viendo sus productos */}
       {user && zonaActiva && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%", maxWidth: "320px" }}>
-          <p>
-            <strong>{zonaActiva.nombre}</strong> — {hogarActivo.nombre}
+        <div className="stack stack-md">
+          <p className="welcome-line">
+            <strong>{zonaActiva.nombre}</strong>{" "}
+            <span className="muted">— {hogarActivo.nombre}</span>
           </p>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {productos.length === 0 && (
-              <p style={{ fontSize: "0.85rem", color: "#777" }}>Aún no hay productos aquí.</p>
-            )}
+          <button className="btn" onClick={volverAHogar}>
+            ← Volver a {hogarActivo.nombre}
+          </button>
+
+          <div className="stack stack-sm">
+            {productos.length === 0 && <p className="muted">Aún no hay productos aquí.</p>}
             {productos.map((p) => (
-              <div
-                key={p.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  border: "1px solid #ccc",
-                  borderRadius: "6px",
-                  padding: "0.4rem 0.6rem",
-                }}
-              >
+              <div key={p.id} className="product-row">
                 <span>
-                  {p.nombre}
+                  <span className="product-name">{p.nombre}</span>
                   {p.fecha_caducidad && (
-                    <>
-                      <br />
-                      <span style={{ fontSize: "0.75rem", color: "#888" }}>
-                        Vence: {p.fecha_caducidad}
-                      </span>
-                    </>
+                    <span className="product-expiry">Vence: {p.fecha_caducidad}</span>
                   )}
                 </span>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                  <button onClick={() => cambiarCantidad(p, -1)}>-</button>
-                  <span>
+                <div className="qty-control">
+                  <button className="qty-btn" onClick={() => cambiarCantidad(p, -1)}>
+                    -
+                  </button>
+                  <span className={`qty-value ${p.cantidad_ideal && p.cantidad < p.cantidad_ideal ? "qty-low" : ""}`}>
                     {p.cantidad}
                     {p.cantidad_ideal ? `/${p.cantidad_ideal}` : ""}
                   </span>
-                  <button onClick={() => cambiarCantidad(p, 1)}>+</button>
-                  <button onClick={() => eliminarProducto(p)} style={{ color: "red" }}>
+                  <button className="qty-btn qty-plus" onClick={() => cambiarCantidad(p, 1)}>
+                    +
+                  </button>
+                  <button className="btn btn-danger btn-icon" onClick={() => eliminarProducto(p)}>
                     ✕
                   </button>
                 </div>
@@ -640,7 +679,7 @@ export default function Home() {
             ))}
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div className="stack stack-sm">
             <input
               type="text"
               placeholder="Nombre del producto"
@@ -662,12 +701,12 @@ export default function Home() {
               value={cantidadIdeal}
               onChange={(e) => setCantidadIdeal(e.target.value)}
             />
-            <button onClick={agregarProducto}>Añadir producto</button>
+            <button className="btn btn-primary" onClick={agregarProducto}>
+              Añadir producto
+            </button>
           </div>
 
-          {mensajeError && <p style={{ color: "red" }}>{mensajeError}</p>}
-
-          <button onClick={volverAHogar}>← Volver a {hogarActivo.nombre}</button>
+          {mensajeError && <p className="error-text">{mensajeError}</p>}
         </div>
       )}
     </main>
