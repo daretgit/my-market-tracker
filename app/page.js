@@ -24,7 +24,6 @@ export default function Home() {
   const [cantidadIdeal, setCantidadIdeal] = useState("");
 
   const [nombreHogar, setNombreHogar] = useState("");
-  const [codigoInvitacion, setCodigoInvitacion] = useState("");
   const [mensajeError, setMensajeError] = useState("");
   const [copiado, setCopiado] = useState(false);
   const [mostrarInvitacion, setMostrarInvitacion] = useState(false);
@@ -220,42 +219,6 @@ export default function Home() {
     setNombreHogar("");
     await cargarMisHogares(user.id);
     setHogarActivo({ id: nuevoHogar.id, nombre: nuevoHogar.nombre, rol: "dueño" });
-  };
-
-  const unirseAHogar = async () => {
-    setMensajeError("");
-    if (!codigoInvitacion.trim()) return;
-
-    const { error } = await supabase
-      .from("miembros_hogar")
-      .insert({ hogar_id: codigoInvitacion.trim(), user_id: user.id, rol: "miembro" });
-
-    if (error) {
-      setMensajeError("Código inválido, o ya perteneces a ese espacio.");
-      return;
-    }
-
-    const { data: hogarUnido } = await supabase
-      .from("hogares")
-      .select("id, nombre")
-      .eq("id", codigoInvitacion.trim())
-      .maybeSingle();
-
-    setCodigoInvitacion("");
-    await cargarMisHogares(user.id);
-    if (hogarUnido) {
-      setHogarActivo({ id: hogarUnido.id, nombre: hogarUnido.nombre, rol: "miembro" });
-    }
-  };
-
-  const copiarCodigo = async () => {
-    try {
-      await navigator.clipboard.writeText(hogarActivo.id);
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
-    } catch (e) {
-      setMensajeError("No se pudo copiar. Copia el código manualmente.");
-    }
   };
 
   const compartirInvitacion = async () => {
@@ -456,7 +419,7 @@ export default function Home() {
   return (
     <main className="app-shell">
       <div className="brand">
-        <span className="brand-mark">MIT</span>
+        <img src="/icons/icon-192.png" alt="My Item Tracker" className="brand-mark" />
         <h1>My Item Tracker</h1>
       </div>
 
@@ -489,10 +452,23 @@ export default function Home() {
         </div>
       )}
 
-      {/* Menú principal: elegir espacio, crear uno nuevo, o unirse a otro */}
+      {/* Menú principal: elegir espacio, o crear uno nuevo */}
       {user && perfil !== null && !hogarActivo && (
         <div className="stack stack-lg">
           <p className="welcome-line">Hola {perfil}, ¿a qué espacio quieres entrar?</p>
+
+          <div className="stack stack-sm">
+            <h3 className="section-title">Añadir un espacio</h3>
+            <input
+              type="text"
+              placeholder="Nombre del espacio"
+              value={nombreHogar}
+              onChange={(e) => setNombreHogar(e.target.value)}
+            />
+            <button className="btn btn-primary" onClick={crearHogar}>
+              Añadir espacio
+            </button>
+          </div>
 
           {misHogares.length > 0 && (
             <div className="stack stack-sm">
@@ -511,35 +487,9 @@ export default function Home() {
             </div>
           )}
 
-          <div className="stack stack-sm">
-            <h3 className="section-title">Añadir un espacio</h3>
-            <input
-              type="text"
-              placeholder="Nombre del espacio"
-              value={nombreHogar}
-              onChange={(e) => setNombreHogar(e.target.value)}
-            />
-            <button className="btn btn-primary" onClick={crearHogar}>
-              Añadir espacio
-            </button>
-          </div>
-
-          <div className="stack stack-sm">
-            <h3 className="section-title">Unirme a un espacio existente</h3>
-            <input
-              type="text"
-              placeholder="Código de invitación"
-              value={codigoInvitacion}
-              onChange={(e) => setCodigoInvitacion(e.target.value)}
-            />
-            <button className="btn" onClick={unirseAHogar}>
-              Unirme
-            </button>
-          </div>
-
           {mensajeError && <p className="error-text">{mensajeError}</p>}
 
-          <button className="btn" onClick={cerrarSesion}>
+          <button className="btn btn-danger" onClick={cerrarSesion}>
             Cerrar sesión
           </button>
 
@@ -560,36 +510,6 @@ export default function Home() {
           <button className="btn" onClick={volverAlMenu}>
             ← Cambiar de espacio
           </button>
-
-          <div className="stack stack-sm">
-            <button className="btn" onClick={() => setMostrarInvitacion(!mostrarInvitacion)}>
-              {mostrarInvitacion ? "Ocultar invitación" : "Compartir invitación"}
-            </button>
-
-            {mostrarInvitacion && (
-              <div className="center-col">
-                <p className="muted">Código de invitación:</p>
-                <code className="code-chip">{hogarActivo.id}</code>
-                <button className="btn" onClick={copiarCodigo}>
-                  {copiado ? "¡Copiado!" : "Copiar código"}
-                </button>
-
-                <div className="qr-frame">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
-                      `${typeof window !== "undefined" ? window.location.origin : ""}?hogar=${hogarActivo.id}`
-                    )}`}
-                    alt="Código QR de invitación"
-                    width={200}
-                    height={200}
-                  />
-                </div>
-                <button className="btn btn-primary" onClick={compartirInvitacion}>
-                  {copiado ? "¡Enlace copiado!" : "Enviar invitación"}
-                </button>
-              </div>
-            )}
-          </div>
 
           <div className="stack stack-sm">
             <h3 className="section-title">Zonas</h3>
@@ -622,6 +542,30 @@ export default function Home() {
 
           <hr className="divider" />
 
+          <div className="stack stack-sm">
+            <button className="btn" onClick={() => setMostrarInvitacion(!mostrarInvitacion)}>
+              {mostrarInvitacion ? "Ocultar invitación" : "Compartir invitación"}
+            </button>
+
+            {mostrarInvitacion && (
+              <div className="center-col">
+                <div className="qr-frame">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                      `${typeof window !== "undefined" ? window.location.origin : ""}?hogar=${hogarActivo.id}`
+                    )}`}
+                    alt="Código QR de invitación"
+                    width={200}
+                    height={200}
+                  />
+                </div>
+                <button className="btn btn-primary" onClick={compartirInvitacion}>
+                  {copiado ? "¡Enlace copiado!" : "Enviar invitación"}
+                </button>
+              </div>
+            )}
+          </div>
+
           {hogarActivo.rol === "dueño" ? (
             <button className="btn btn-danger" onClick={eliminarHogar}>
               Eliminar este espacio
@@ -631,10 +575,6 @@ export default function Home() {
               Salir de este espacio
             </button>
           )}
-
-          <button className="btn" onClick={cerrarSesion}>
-            Cerrar sesión
-          </button>
         </div>
       )}
 
