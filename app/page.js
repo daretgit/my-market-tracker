@@ -448,7 +448,7 @@ export default function Home() {
         textAlign: "center",
       }}
     >
-      <h1>My Market Tracker</h1>
+      <h1>My Item Tracker</h1>
 
       {/* No ha iniciado sesión */}
       {!user && (
